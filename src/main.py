@@ -1,7 +1,7 @@
 import logging
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from src.bot.handlers import PokemonTradeBot  # Import assoluto
-from src.utils.constants import BOT_TOKEN  # Import assoluto
+from bot.handlers import PokemonTradeBot  # Import assoluto
+from utils.constants import BOT_TOKEN  # Import assoluto
 
 # Configurazione del logging
 logging.basicConfig(
@@ -26,6 +26,8 @@ def main():
     application.add_handler(CommandHandler("lemiecarte", pokemon_bot.view_my_cards))
     application.add_handler(CommandHandler("lemiericerche", pokemon_bot.view_my_searches))
     application.add_handler(CommandHandler("cartedisponibili", pokemon_bot.view_all_cards))
+    application.add_handler(CommandHandler("matches", pokemon_bot.view_matches))
+    application.add_handler(CommandHandler("completascambio", pokemon_bot.complete_trade))
     
     # Handler per le callback dei bottoni
     application.add_handler(CallbackQueryHandler(pokemon_bot.handle_callback))

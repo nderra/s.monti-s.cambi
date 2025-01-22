@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from ..utils.constants import RARITY_LEVELS
+from utils.constants import RARITY_LEVELS
 
 def get_rarity_keyboard(action_prefix: str) -> InlineKeyboardMarkup:
     """
