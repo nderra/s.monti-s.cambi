@@ -41,7 +41,25 @@ class Database:
                     FOREIGN KEY (user_id) REFERENCES users (id)
                 )
             ''')
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS card_sets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    set_name TEXT NOT NULL,
+                    set_code TEXT NOT NULL UNIQUE
+                )
+            ''')
 
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS cards (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    set_id INTEGER,
+                    card_name TEXT NOT NULL,
+                    rarity TEXT NOT NULL,
+                    rarity_icon TEXT NOT NULL,
+                    FOREIGN KEY (set_id) REFERENCES card_sets (id)
+                )
+            ''')
+            
     async def save_user(self, user_data: dict):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
@@ -175,3 +193,60 @@ class Database:
                 DELETE FROM offers WHERE id = ?;
                 COMMIT;
             ''', (search_id, offer_id))
+
+    async def add_set(self, set_name: str, set_code: str):
+        """Aggiunge un nuovo set di carte al database."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('''
+                INSERT OR IGNORE INTO card_sets (set_name, set_code)
+                VALUES (?, ?)
+            ''', (set_name, set_code))
+            return cursor.lastrowid
+
+    async def add_card(self, set_code: str, card_name: str, rarity: str, rarity_icon: str):
+        """Aggiunge una nuova carta al database."""
+        with sqlite3.connect(self.db_path) as conn:
+            # Prima ottieni l'ID del set
+            cursor = conn.execute('SELECT id FROM card_sets WHERE set_code = ?', (set_code,))
+            row = cursor.fetchone()
+            if row:
+                set_id = row[0]
+                # Poi inserisci la carta
+                cursor = conn.execute('''
+                    INSERT OR IGNORE INTO cards (set_id, card_name, rarity, rarity_icon)
+                    VALUES (?, ?, ?, ?)
+                ''', (set_id, card_name, rarity, rarity_icon))
+                return cursor.lastrowid
+
+    async def get_all_sets(self) -> list:
+        """Ottiene tutti i set di carte disponibili."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('SELECT * FROM card_sets ORDER BY set_name')
+            return [dict(zip([col[0] for col in cursor.description], row))
+                    for row in cursor.fetchall()]
+
+    async def get_cards_by_rarity(self, set_code: str, rarity: str) -> list:
+        """Ottiene tutte le carte di una certa rarità in un set."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('''
+                SELECT c.* FROM cards c
+                JOIN card_sets s ON c.set_id = s.id
+                WHERE s.set_code = ? AND c.rarity = ?
+                ORDER BY c.card_name
+            ''', (set_code, rarity))
+            return [dict(zip([col[0] for col in cursor.description], row))
+                    for row in cursor.fetchall()]
+
+    async def get_card_by_id(self, card_id: int) -> dict:
+        """Recupera una carta dal database usando il suo ID."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('''
+                SELECT c.*, s.set_name, s.set_code 
+                FROM cards c
+                JOIN card_sets s ON c.set_id = s.id
+                WHERE c.id = ?
+            ''', (card_id,))
+            row = cursor.fetchone()
+            if row:
+                return dict(zip([col[0] for col in cursor.description], row))
+            return None
