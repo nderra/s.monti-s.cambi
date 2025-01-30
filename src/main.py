@@ -30,12 +30,16 @@ def main():
     application.add_handler(CommandHandler("lemiecarte", pokemon_bot.view_my_cards))
     application.add_handler(CommandHandler("lemiericerche", pokemon_bot.view_my_searches))
     application.add_handler(CommandHandler("cartedisponibili", pokemon_bot.view_all_cards))
+    application.add_handler(CommandHandler("wanted", pokemon_bot.wanted))
     application.add_handler(CommandHandler("matches", pokemon_bot.view_matches))
     application.add_handler(CommandHandler("completascambio", pokemon_bot.complete_trade))
+    application.add_handler(CommandHandler("eliminaofferta", pokemon_bot.delete_offer))
+    application.add_handler(CommandHandler("eliminaricerca", pokemon_bot.delete_search))
 
     # Handler per i messaggi di testo
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, pokemon_bot.handle_message))
-    
+    application.add_handler(CallbackQueryHandler(pokemon_bot.handle_deletion, pattern='^(del_|back_)'))
+
     # Avviamo il bot
     logging.info("Bot avviato!")
     application.run_polling()

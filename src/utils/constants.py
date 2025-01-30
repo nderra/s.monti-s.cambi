@@ -22,7 +22,10 @@ Puoi utilizzare i seguenti comandi:
 /lemiecarte - Visualizza le tue carte offerte
 /lemiericerche - Visualizza le tue ricerche attive
 /cartedisponibili - Visualizza tutte le carte scambiabili
+/wanted - Visualizza tutte le carte ricercate
 /matches - Visualizza i tuoi match attivi
+/eliminaofferta - Elimina una tua offerta
+/eliminaricerca - Elimina una tua ricerca
     """,
     'select_rarity': "Seleziona la rarità della carta:",
     'enter_card_name': "Inserisci il nome della carta:",

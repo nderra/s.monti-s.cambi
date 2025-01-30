@@ -166,6 +166,21 @@ class Database:
             return [dict(zip([col[0] for col in cursor.description], row)) 
                    for row in cursor.fetchall()]
 
+    async def get_all_searches(self) -> list:
+        """Recupera tutte le ricerche attive con i relativi utenti."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('''
+                SELECT 
+                    s.card_name,
+                    s.rarity,
+                    u.username
+                FROM searches s
+                JOIN users u ON s.user_id = u.id
+                ORDER BY s.timestamp DESC
+            ''')
+            return [dict(zip([col[0] for col in cursor.description], row)) 
+                   for row in cursor.fetchall()]
+
     async def get_user_matches(self, user_id: int) -> list:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute('''
@@ -250,3 +265,13 @@ class Database:
             if row:
                 return dict(zip([col[0] for col in cursor.description], row))
             return None
+
+    async def delete_offer(self, offer_id: int):
+        """Elimina un'offerta dal database."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('DELETE FROM offers WHERE id = ?', (offer_id,))
+
+    async def delete_search(self, search_id: int):
+        """Elimina una ricerca dal database."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('DELETE FROM searches WHERE id = ?', (search_id,))

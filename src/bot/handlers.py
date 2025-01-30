@@ -28,12 +28,18 @@ class PokemonTradeBot:
     def __init__(self):
         self.db = Database()
 
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def get_main_keyboard(self):
+        """Helper method per ottenere la tastiera principale"""
         keyboard = [
             ['/offri', '/cerca'],
             ['/lemiecarte', '/lemiericerche'],
-            ['/cartedisponibili', '/matches']
+            ['/cartedisponibili', '/wanted'],
+            ['/eliminaofferta', '/eliminaricerca'],
+            ['/matches']
         ]
+        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         try:
             await self.db.save_user({
@@ -47,7 +53,7 @@ class PokemonTradeBot:
             })
             await update.message.reply_text(
                 MESSAGES['welcome'],
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                reply_markup=self.get_main_keyboard()
             )
         except Exception as e:
             logging.error(f"Error in start command: {str(e)}")
@@ -62,7 +68,9 @@ class PokemonTradeBot:
                     set_data['set_name'],
                     callback_data=f"set_{set_data['set_code']}"
                 )])
-            
+
+            keyboard.append([InlineKeyboardButton("🔙 Indietro", callback_data="back_to_main")])
+
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
                 "Seleziona l'espansione:",
@@ -184,7 +192,9 @@ class PokemonTradeBot:
                     set_data['set_name'],
                     callback_data=f"search_set_{set_data['set_code']}"
                 )])
-            
+
+            keyboard.append([InlineKeyboardButton("🔙 Indietro", callback_data="back_to_main")])
+
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
                 "Seleziona l'espansione da cercare:",
@@ -345,6 +355,37 @@ class PokemonTradeBot:
             logging.error(f"Error in view_all_cards: {str(e)}")
             await update.message.reply_text("Si è verificato un errore nel recupero delle carte.")
 
+    async def wanted(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Visualizza tutte le carte ricercate dagli utenti."""
+        try:
+            searches = await self.db.get_all_searches()
+            
+            if not searches:
+                await update.message.reply_text("Non ci sono carte ricercate al momento.")
+                return
+
+            # Raggruppa le ricerche per carta e rarità
+            grouped_searches = {}
+            for search in searches:
+                key = (search['card_name'], search['rarity'])
+                if key not in grouped_searches:
+                    grouped_searches[key] = []
+                grouped_searches[key].append(search['username'] or "Utente anonimo")
+
+            # Costruisci il messaggio
+            message = "Carte ricercate:\n\n"
+            for (card_name, rarity), users in grouped_searches.items():
+                unique_users = list(set(users))  # Rimuovi duplicati
+                user_list = ", ".join([f"@{user}" if not user.startswith("Utente") else user 
+                                     for user in unique_users])
+                message += (f"• {card_name.title()} {RARITY_LEVELS[rarity]['symbol']}\n"
+                          f"  Cercata da: {user_list}\n\n")
+
+            await update.message.reply_text(message)
+        except Exception as e:
+            logging.error(f"Error in wanted: {str(e)}")
+            await update.message.reply_text("Si è verificato un errore nel recupero delle carte ricercate.")
+
     async def view_matches(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             matches = await self.db.get_user_matches(update.effective_user.id)
@@ -450,3 +491,162 @@ class PokemonTradeBot:
         except Exception as e:
             logging.error(f"Error in handle_message: {str(e)}")
             await update.message.reply_text("Si è verificato un errore. Riprova più tardi.")
+
+    async def delete_offer(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Gestisce il comando per eliminare un'offerta"""
+        try:
+            offers = await self.db.get_user_offers(update.effective_user.id)
+            
+            if not offers:
+                await update.message.reply_text("Non hai nessuna carta offerta da eliminare.")
+                return
+            
+            keyboard = []
+            for offer in offers:
+                callback_data = f"del_offer_{offer['id']}"
+                button_text = f"❌ {offer['card_name'].title()} {RARITY_LEVELS[offer['rarity']]['symbol']}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+            
+            # Aggiungi pulsante indietro
+            keyboard.append([InlineKeyboardButton("🔙 Indietro", callback_data="back_to_main")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "Seleziona la carta da eliminare:",
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logging.error(f"Error in delete_offer: {str(e)}")
+            await update.message.reply_text("Si è verificato un errore. Riprova più tardi.")
+
+    async def delete_search(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Gestisce il comando per eliminare una ricerca"""
+        try:
+            searches = await self.db.get_user_searches(update.effective_user.id)
+            
+            if not searches:
+                await update.message.reply_text("Non hai nessuna ricerca da eliminare.")
+                return
+            
+            keyboard = []
+            for search in searches:
+                callback_data = f"del_search_{search['id']}"
+                button_text = f"❌ {search['card_name'].title()} {RARITY_LEVELS[search['rarity']]['symbol']}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+            
+            # Aggiungi pulsante indietro
+            keyboard.append([InlineKeyboardButton("🔙 Indietro", callback_data="back_to_main")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "Seleziona la ricerca da eliminare:",
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logging.error(f"Error in delete_search: {str(e)}")
+            await update.message.reply_text("Si è verificato un errore. Riprova più tardi.")
+
+    async def handle_deletion(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Gestisce la callback di eliminazione"""
+        query = update.callback_query
+        await query.answer()
+        
+        try:
+            # Gestisci il pulsante indietro
+            if query.data == "back_to_main":
+                await query.message.reply_text(
+                    "Torna al menu principale:",
+                    reply_markup=self.get_main_keyboard()
+                )
+                await query.message.delete()
+                return
+
+            action, item_type, item_id = query.data.split('_')
+            if action == "del":
+                if item_type == "offer":
+                    await self.db.delete_offer(int(item_id))
+                    message = "Offerta eliminata con successo!"
+                else:  # search
+                    await self.db.delete_search(int(item_id))
+                    message = "Ricerca eliminata con successo!"
+                    
+                await query.edit_message_text(message)
+        except Exception as e:
+            logging.error(f"Error in handle_deletion: {str(e)}")
+            await query.edit_message_text("Si è verificato un errore. Riprova più tardi.")
+
+    async def handle_set_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        
+        try:
+            if query.data == "back_to_main":
+                await query.message.reply_text(
+                    "Torna al menu principale:",
+                    reply_markup=self.get_main_keyboard()
+                )
+                await query.message.delete()
+                return ConversationHandler.END
+                
+            set_code = query.data.replace('set_', '')
+            context.user_data['selected_set'] = set_code
+            
+            keyboard = []
+            for rarity_name in RARITY_ORDER:
+                callback_data = f"rarity|{rarity_name}"
+                keyboard.append([InlineKeyboardButton(
+                    RARITY_LEVELS[rarity_name]['symbol'],
+                    callback_data=callback_data
+                )])
+            
+            # Aggiungi pulsante indietro
+            keyboard.append([InlineKeyboardButton("🔙 Indietro", callback_data="back_to_main")])
+            
+            await query.edit_message_text(
+                "Seleziona la rarità della carta:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return RARITY_SELECTION
+            
+        except Exception as e:
+            logging.error(f"Error in handle_set_selection: {str(e)}")
+            await query.edit_message_text("Si è verificato un errore. Riprova più tardi.")
+            return ConversationHandler.END
+
+    async def handle_search_set_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        
+        try:
+            if query.data == "back_to_main":
+                await query.message.reply_text(
+                    "Torna al menu principale:",
+                    reply_markup=self.get_main_keyboard()
+                )
+                await query.message.delete()
+                return ConversationHandler.END
+
+            set_code = query.data.replace('search_set_', '')
+            context.user_data['selected_set'] = set_code
+            
+            keyboard = []
+            for rarity_name in RARITY_ORDER:
+                callback_data = f"search_rarity|{rarity_name}"
+                keyboard.append([InlineKeyboardButton(
+                    RARITY_LEVELS[rarity_name]['symbol'],
+                    callback_data=callback_data
+                )])
+            
+            # Aggiungi pulsante indietro
+            keyboard.append([InlineKeyboardButton("🔙 Indietro", callback_data="back_to_main")])
+            
+            await query.edit_message_text(
+                "Seleziona la rarità della carta da cercare:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return SEARCH_RARITY_SELECTION
+            
+        except Exception as e:
+            logging.error(f"Error in handle_search_set_selection: {str(e)}")
+            await query.edit_message_text("Si è verificato un errore. Riprova più tardi.")
+            return ConversationHandler.END
